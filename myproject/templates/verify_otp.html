@@ -1,0 +1,268 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Verify OTP</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet">
+
+<style>
+body {
+  background: linear-gradient(135deg,#fff8e1,#fff3cd);
+  font-family: "Segoe UI", system-ui;
+  margin: 0;
+  padding: 0;
+}
+
+.otp-wrapper {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.otp-card {
+  background: #fff;
+  width: 90%;
+  max-width: 500px;
+  border-radius: 18px;
+  padding: 30px 25px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.15);
+  text-align: center;
+}
+
+.otp-card h4 {
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.otp-card p {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.otp-boxes {
+  display: flex;
+  justify-content: space-between; /* Spread boxes evenly */
+  gap: 10px;
+  margin: 25px 0;
+  flex-wrap: nowrap; /* keep all 6 boxes in one row */
+}
+
+.otp-box {
+  flex: 1 1 0;       /* Equal width for all boxes */
+  max-width: 60px;   /* Limit max width */
+  min-width: 40px;   /* Limit min width */
+  height: clamp(50px, 12vw, 65px);
+  font-size: clamp(20px, 4vw, 28px);
+  text-align: center;
+  border-radius: 12px;
+  border: 2px solid rgb(225,165,12);
+  outline: none;
+  font-weight: 700;
+}
+
+.otp-box:focus {
+  box-shadow: 0 0 0 3px rgba(225,165,12,.25);
+}
+
+.verify-btn {
+  height: 55px;
+  border-radius: 14px;
+  background: linear-gradient(135deg,rgb(225,165,12),#ffcc33);
+  color: white;
+  font-weight: 700;
+  border: none;
+  font-size: 1.1rem;
+}
+
+.shake {
+  animation: shake .3s;
+}
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  50% { transform: translateX(6px); }
+  75% { transform: translateX(-6px); }
+  100% { transform: translateX(0); }
+}
+
+/* Small devices */
+@media (max-width:480px) {
+  .otp-box {
+    height: 50px;
+    font-size: 20px;
+  }
+  .otp-card {
+    padding: 20px 15px;
+  }
+  .verify-btn {
+    font-size: 1rem;
+    height: 50px;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="otp-wrapper">
+  <div class="otp-card">
+
+    <h4>Verify Your Email</h4>
+    <p>We’ve sent a 6-digit OTP to<br><strong>{{ email }}</strong></p>
+
+    <form id="otpForm">
+      {% csrf_token %}
+      <input type="hidden" id="email" value="{{ email }}">
+      <input type="hidden" id="otp">
+
+      <div class="otp-boxes" id="otpBoxes">
+        <input class="otp-box" maxlength="1">
+        <input class="otp-box" maxlength="1">
+        <input class="otp-box" maxlength="1">
+        <input class="otp-box" maxlength="1">
+        <input class="otp-box" maxlength="1">
+        <input class="otp-box" maxlength="1">
+      </div>
+
+      <button type="submit" class="verify-btn w-100">Verify & Continue</button>
+    </form>
+
+    <div id="msg" class="mt-3 fw-semibold"></div>
+
+    <div class="mt-4">
+      Didn’t receive the code?<br>
+      <button id="resendBtn" class="btn btn-link fw-bold" disabled>
+        Resend OTP (<span id="timer">30</span>s)
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// CSRF
+function getCookie(name) {
+  let v = null;
+  if (document.cookie) {
+    document.cookie.split(";").forEach(c => {
+      c = c.trim();
+      if (c.startsWith(name + "=")) v = decodeURIComponent(c.substring(name.length + 1));
+    });
+  }
+  return v;
+}
+const csrftoken = getCookie("csrftoken");
+
+// OTP boxes
+const boxes = [...document.querySelectorAll(".otp-box")];
+boxes[0].focus();
+
+boxes.forEach((box, i) => {
+  box.addEventListener("input", () => {
+    box.value = box.value.replace(/[^0-9]/g, "");
+    if (box.value && boxes[i + 1]) boxes[i + 1].focus();
+    updateOtp();
+  });
+  box.addEventListener("keydown", e => {
+    if (e.key === "Backspace" && !box.value && boxes[i - 1]) boxes[i - 1].focus();
+  });
+});
+
+document.getElementById("otpBoxes").addEventListener("paste", e => {
+  e.preventDefault();
+  const data = (e.clipboardData || window.clipboardData).getData("text").replace(/\D/g, "").slice(0, 6);
+  boxes.forEach((b, i) => b.value = data[i] || "");
+  updateOtp();
+});
+
+function updateOtp() {
+  const otp = boxes.map(b => b.value).join("");
+  document.getElementById("otp").value = otp;
+  if (otp.length === 6) {
+    document.getElementById("otpForm").requestSubmit();
+  }
+}
+
+// Submit OTP
+document.getElementById("otpForm").onsubmit = async e => {
+  e.preventDefault();
+  const email = document.getElementById("email").value;
+  const otp = document.getElementById("otp").value;
+
+  const res = await fetch("{% url 'verify_otp' %}", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRFToken": csrftoken
+    },
+    body: new URLSearchParams({ email, otp })
+  });
+
+  const result = await res.json();
+  document.getElementById("msg").innerText = result.message;
+
+  if (result.status === "success") {
+    setTimeout(() => window.location.href = "/" + result.redirect_url + "/", 1000);
+  } else {
+    document.getElementById("otpBoxes").classList.add("shake");
+    setTimeout(() => document.getElementById("otpBoxes").classList.remove("shake"), 300);
+  }
+};
+
+// Resend OTP timer
+let t = 30;
+let interval;
+const resendBtn = document.getElementById("resendBtn");
+
+function startTimer() {
+  resendBtn.disabled = true;
+  clearInterval(interval);
+
+  interval = setInterval(() => {
+    t--;
+
+    // Always re-fetch the span (important!)
+    const timerSpan = document.getElementById("timer");
+    if (timerSpan) timerSpan.innerText = t;
+
+    if (t <= 0) {
+      clearInterval(interval);
+      resendBtn.disabled = false;
+      if (timerSpan) timerSpan.innerText = 0;
+    }
+  }, 1000);
+}
+
+startTimer();
+
+resendBtn.onclick = async () => {
+  resendBtn.disabled = true;
+  resendBtn.innerText = "Sending...";
+
+  const email = document.getElementById("email").value;
+
+  await fetch("{% url 'resend_otp' %}", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRFToken": csrftoken
+    },
+    body: new URLSearchParams({ email })
+  });
+
+  // Rebuild button
+  t = 30;
+  resendBtn.innerHTML = `Resend OTP (<span id="timer">${t}</span>s)`;
+
+  startTimer();
+};
+
+</script>
+
+</body>
+</html>

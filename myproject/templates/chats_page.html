@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Messages</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Roboto, Arial, sans-serif;
+            background: #f4f6fb;
+            color: #1f2937;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* LEFT PANEL */
+        .chat-list {
+            width: 28%;
+            background: #ffffff;
+            border-right: 1px solid #e5e7eb;
+            overflow-y: auto;
+            transition: 0.3s;
+        }
+
+        .chat-list-header {
+            padding: 16px;
+            font-size: 18px;
+            font-weight: 600;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .chat-item {
+            padding: 14px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .chat-item:hover { background: #f8fafc; }
+
+        .chat-item.active {
+            background: #eef2ff;
+            border-left: 4px solid #4f46e5;
+        }
+
+        .chat-name { font-weight: 600; }
+
+        .last-message {
+            font-size: 13px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        /* RIGHT PANEL */
+        .chat-window {
+            width: 72%;
+            display: flex;
+            flex-direction: column;
+            background: #f9fafb;
+            transition: 0.3s;
+        }
+
+        .chat-header {
+            background: #ffffff;
+            padding: 14px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .back-btn {
+            display: none;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .msg {
+            max-width: 75%;
+            padding: 10px 14px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .sent {
+            background: #4f46e5;
+            color: white;
+            margin-left: auto;
+        }
+
+        .received {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+        }
+
+        .input-box {
+            display: flex;
+            padding: 14px;
+            background: #ffffff;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .input-box input {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+        }
+
+        .input-box button {
+            margin-left: 10px;
+            padding: 10px 16px;
+            border: none;
+            background: #4f46e5;
+            color: white;
+            border-radius: 6px;
+        }
+
+        .empty {
+            margin: auto;
+            text-align: center;
+            color: #6b7280;
+        }
+
+        /* MOBILE */
+        @media (max-width: 768px) {
+            .chat-list {
+                width: 100%;
+                position: absolute;
+                height: 100%;
+                z-index: 10;
+            }
+
+            .chat-window {
+                width: 100%;
+                position: absolute;
+                height: 100%;
+                transform: translateX(100%);
+                z-index: 20;
+            }
+
+            .chat-window.active {
+                transform: translateX(0);
+            }
+
+            .chat-list.hidden {
+                transform: translateX(-100%);
+            }
+
+            .back-btn {
+                display: block;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- LEFT -->
+    <div class="chat-list" id="chatList">
+        <div class="chat-list-header">Messages</div>
+
+        {% if chats %}
+            {% for chat in chats %}
+            <div class="chat-item {% if selected_chat and chat.id == selected_chat.id %}active{% endif %}"
+                 onclick="window.location.href='/chats/{{ chat.id }}/'">
+
+                <div class="chat-name">
+                    {% if current_user_type == 'freelancer' %}
+                        {{ chat.recruiter.full_name }}
+                    {% else %}
+                        {{ chat.freelancer.full_name }}
+                    {% endif %}
+                </div>
+
+                <div class="last-message">
+                    {{ chat.last_message|default:"No messages yet" }}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty">No conversations yet</div>
+        {% endif %}
+    </div>
+
+    <!-- RIGHT -->
+    <div class="chat-window {% if selected_chat %}active{% endif %}" id="chatWindow">
+
+        {% if selected_chat %}
+
+        <div class="chat-header">
+            <span class="back-btn" onclick="window.location.href='/chats/'">←</span>
+            {% if current_user_type == 'freelancer' %}
+                {{ selected_chat.recruiter.full_name }}
+            {% else %}
+                {{ selected_chat.freelancer.full_name }}
+            {% endif %}
+        </div>
+
+        <div class="messages">
+            {% if messages %}
+                {% for msg in messages %}
+                    <div class="msg {% if msg.sender_type == current_user_type %}sent{% else %}received{% endif %}">
+                        {{ msg.text }}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty">
+                    👋 Start the conversation  
+                    <br><small>Send a message to begin chatting</small>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="input-box">
+            <input type="text" id="messageInput" placeholder="Type your message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+
+        {% else %}
+            <div class="empty">Select a chat to start messaging</div>
+        {% endif %}
+
+    </div>
+
+</div>
+
+<script>
+function sendMessage() {
+    const text = document.getElementById("messageInput").value.trim();
+    if (!text) return;
+
+    fetch("/send-message/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: new URLSearchParams({
+            chat_id: "{{ selected_chat.id }}",
+            sender_type: "{{ current_user_type }}",
+            sender_id: "{{ current_user_id }}",
+            text: text
+        })
+    }).then(() => location.reload());
+}
+</script>
+
+</body>
+</html>

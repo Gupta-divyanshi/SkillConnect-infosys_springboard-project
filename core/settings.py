@@ -9,7 +9,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', cast=bool)
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "skillconnect.onrender.com"]
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost,skillconnect.onrender.com").split(",")
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -107,10 +107,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = False
 SESSION_COOKIE_SECURE = False
-CSRF_TRUSTED_ORIGINS = [
-    "https://*.onrender.com",
-]
 
+CSRF_TRUSTED_ORIGINS = [
+    f"https://{host.strip()}" for host in ALLOWED_HOSTS if host != "127.0.0.1" and host != "localhost"
+]
 ANYMAIL = {
     "BREVO_API_KEY": os.environ.get("EMAIL_HOST_PASSWORD"),  # set this on Render
 }

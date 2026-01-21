@@ -1,7 +1,6 @@
-# SkillConnect-infosys_springboard-project
+# SkillConnect-infosys_springboard-project🚀
 A web platform designed to bridge the gap between freelancers and recruiters.
 
-# SkillConnect 🚀
 
 > **Live Demo:** [https://skillconnect-47cb.onrender.com](https://skillconnect-47cb.onrender.com)
 
